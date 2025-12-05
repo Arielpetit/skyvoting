@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Vote } from "lucide-react";
+import { Vote, Trophy } from "lucide-react";
 
 interface ParticipantCardProps {
   id: string;
@@ -34,31 +34,40 @@ export const ParticipantCard = ({
 
   // Generate a color based on the name for the avatar background
   const colors = [
-    "bg-chart-1",
-    "bg-chart-2",
-    "bg-chart-3",
-    "bg-chart-4",
-    "bg-chart-5",
+    "bg-chart-1 text-foreground",
+    "bg-chart-2 text-foreground",
+    "bg-chart-3 text-primary-foreground",
+    "bg-chart-4 text-foreground",
+    "bg-chart-5 text-foreground",
   ];
   const colorIndex = name.charCodeAt(0) % colors.length;
   const avatarColor = colors[colorIndex];
 
   return (
-    <Card className={`transition-all duration-200 ${votedForThis ? "ring-2 ring-primary shadow-lg" : "hover:shadow-md"}`}>
+    <Card
+      className={`transition-all duration-300 ${
+        votedForThis
+          ? "ring-2 ring-primary shadow-lg bg-primary/5"
+          : "hover:shadow-md hover:bg-muted/30"
+      }`}
+    >
       <CardContent className="flex items-center gap-4 p-4">
-        <Avatar className="h-14 w-14 shrink-0">
-          {avatarUrl ? (
-            <AvatarImage src={avatarUrl} alt={name} />
-          ) : null}
-          <AvatarFallback className={`${avatarColor} text-foreground font-semibold text-lg`}>
+        <Avatar className="h-14 w-14 shrink-0 ring-2 ring-border">
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
+          <AvatarFallback className={`${avatarColor} font-semibold text-lg`}>
             {initials}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate">{name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-foreground truncate">{name}</h3>
+            {votedForThis && (
+              <Trophy className="h-4 w-4 text-primary shrink-0" />
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="font-mono">
+            <Badge variant="secondary" className="font-mono text-xs">
               {votes} {votes === 1 ? "vote" : "votes"}
             </Badge>
           </div>
@@ -67,7 +76,7 @@ export const ParticipantCard = ({
         <div className="shrink-0">
           {hasVoted ? (
             votedForThis ? (
-              <Badge variant="default" className="bg-primary text-primary-foreground">
+              <Badge className="bg-primary text-primary-foreground">
                 Your vote
               </Badge>
             ) : null
@@ -76,7 +85,7 @@ export const ParticipantCard = ({
               onClick={() => onVote(id)}
               disabled={isVoting}
               size="sm"
-              className="gap-2"
+              className="gap-2 transition-all hover:scale-105"
             >
               <Vote className="h-4 w-4" />
               Vote
