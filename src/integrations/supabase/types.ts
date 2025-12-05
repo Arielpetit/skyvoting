@@ -14,7 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      device_votes: {
+        Row: {
+          created_at: string
+          device_fingerprint: string
+          id: string
+          participant_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_fingerprint: string
+          id?: string
+          participant_id: string
+        }
+        Update: {
+          created_at?: string
+          device_fingerprint?: string
+          id?: string
+          participant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_votes_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          name: string
+          votes: number
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          votes?: number
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          votes?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
