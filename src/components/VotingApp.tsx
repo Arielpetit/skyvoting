@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddParticipantForm } from "./AddParticipantForm";
 import { Plus, X } from "lucide-react";
@@ -29,9 +30,6 @@ interface Participant {
   votes: number;
 }
 
-// Set deadline to 7 days from now (you can customize this)
-const VOTING_DEADLINE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
 export const VotingApp = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +37,8 @@ export const VotingApp = () => {
   const [votedForName, setVotedForName] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
+  const [deadline, setDeadline] = useState<Date | null>(null);
+  const [newDeadline, setNewDeadline] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
@@ -58,7 +58,6 @@ export const VotingApp = () => {
 
       if (data) {
         setHasVoted(true);
-        // @ts-expect-error - Supabase types might verify this, but for now assuming join works
         setVotedForName(data.participants?.name || "a participant");
       }
     };
@@ -66,12 +65,37 @@ export const VotingApp = () => {
     checkVote();
   }, [user]);
 
+  // Fetch deadline
+  useEffect(() => {
+    const fetchDeadline = async () => {
+      const { data } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "voting_deadline")
+        .single();
+
+      if (data?.value) {
+        const parsedDate = new Date(data.value);
+        setDeadline(parsedDate);
+        // Format for datetime-local input: YYYY-MM-DDTHH:mm
+        const localIsoString = new Date(parsedDate.getTime() - parsedDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16);
+        setNewDeadline(localIsoString);
+      }
+    };
+
+    fetchDeadline();
+  }, []);
+
   // Check deadline
   useEffect(() => {
-    if (new Date() > VOTING_DEADLINE) {
+    if (deadline && new Date() > deadline) {
       setIsExpired(true);
+    } else if (deadline) {
+      setIsExpired(false);
     }
-  }, []);
+  }, [deadline]);
 
   // Fetch participants
   useEffect(() => {
@@ -124,6 +148,35 @@ export const VotingApp = () => {
       description: "The voting period has ended.",
     });
   }, [toast]);
+
+  const handleSetDeadline = async () => {
+    if (!isAdmin || !newDeadline) return;
+
+    const date = new Date(newDeadline);
+    if (isNaN(date.getTime())) {
+      toast({ title: "Invalid date format", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Use upsert to either insert or update the deadline
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key: "voting_deadline", value: date.toISOString() }, { onConflict: "key" });
+
+      if (error) throw error;
+
+      setDeadline(date);
+      toast({ title: "Success", description: "Voting deadline updated." });
+    } catch (error) {
+      console.error("Error setting deadline:", error);
+      toast({
+        title: "Error",
+        description: "Failed to set deadline. Make sure the 'settings' table is created.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDelete = async (participantId: string) => {
     if (!isAdmin) return;
@@ -298,9 +351,38 @@ export const VotingApp = () => {
           </div>
         )}
 
+        {/* Admin Deadline Setter */}
+        {isAdmin && (
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-medium mb-2">Set Voting Deadline</h3>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="datetime-local"
+                  value={newDeadline}
+                  onChange={(e) => setNewDeadline(e.target.value)}
+                  className="flex-grow"
+                />
+                <Button onClick={handleSetDeadline}>Set</Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Current deadline: {deadline ? deadline.toLocaleString() : "Not set"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Countdown Timer */}
         <div className="mb-6">
-          <CountdownTimer deadline={VOTING_DEADLINE} onExpired={handleDeadlineExpired} />
+          {deadline ? (
+            <CountdownTimer deadline={deadline} onExpired={handleDeadlineExpired} />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                The voting period has not been set.
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Thank You Message */}
