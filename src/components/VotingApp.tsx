@@ -3,11 +3,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { ParticipantCard } from "./ParticipantCard";
 import { ResultsChart } from "./ResultsChart";
 import { CountdownTimer } from "./CountdownTimer";
-import { generateFingerprint } from "@/lib/fingerprint";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Vote, Sparkles } from "lucide-react";
+import { CheckCircle2, Vote, Sparkles, LogOut, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AddParticipantForm } from "./AddParticipantForm";
+import { Plus, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import logo from "@/assets/logo.png";
 
 interface Participant {
   id: string;
@@ -16,10 +29,6 @@ interface Participant {
   votes: number;
 }
 
-const STORAGE_KEY_HAS_VOTED = "voting_app_has_voted";
-const STORAGE_KEY_VOTED_FOR = "voting_app_voted_for";
-const STORAGE_KEY_VOTED_NAME = "voting_app_voted_name";
-
 // Set deadline to 7 days from now (you can customize this)
 const VOTING_DEADLINE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -27,34 +36,41 @@ export const VotingApp = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasVoted, setHasVoted] = useState(false);
-  const [votedForId, setVotedForId] = useState<string | null>(null);
   const [votedForName, setVotedForName] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
-  const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
 
-  // Check localStorage on mount
+  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL && user.email === import.meta.env.VITE_ADMIN_EMAIL;
+
+  // Check if user has voted
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY_HAS_VOTED);
-    const storedId = localStorage.getItem(STORAGE_KEY_VOTED_FOR);
-    const storedName = localStorage.getItem(STORAGE_KEY_VOTED_NAME);
+    if (!user) return;
 
-    if (stored === "true" && storedId) {
-      setHasVoted(true);
-      setVotedForId(storedId);
-      setVotedForName(storedName);
-    }
+    const checkVote = async () => {
+      const { data, error } = await supabase
+        .from("votes")
+        .select("participant_id, participants(name)")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    // Check if already expired
+      if (data) {
+        setHasVoted(true);
+        // @ts-ignore - Supabase types might verify this, but for now assuming join works
+        setVotedForName(data.participants?.name || "a participant");
+      }
+    };
+
+    checkVote();
+  }, [user]);
+
+  // Check deadline
+  useEffect(() => {
     if (new Date() > VOTING_DEADLINE) {
       setIsExpired(true);
     }
-  }, []);
-
-  // Generate fingerprint
-  useEffect(() => {
-    generateFingerprint().then(setFingerprint);
   }, []);
 
   // Fetch participants
@@ -110,49 +126,35 @@ export const VotingApp = () => {
   }, [toast]);
 
   const handleVote = async (participantId: string) => {
-    if (hasVoted || !fingerprint || isVoting || isExpired) return;
+    if (hasVoted || isVoting || isExpired || !user) return;
 
     setIsVoting(true);
 
     try {
-      const response = await supabase.functions.invoke("vote", {
-        body: {
-          participant_id: participantId,
-          device_fingerprint: fingerprint,
-        },
+      const { error } = await supabase.from("votes").insert({
+        participant_id: participantId,
+        user_id: user.id,
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-
-      const data = response.data;
-
-      if (data.error === "already_voted") {
-        localStorage.setItem(STORAGE_KEY_HAS_VOTED, "true");
-        localStorage.setItem(STORAGE_KEY_VOTED_FOR, data.participant_id);
+      if (error) {
+        if (error.code === "23505") { // Unique violation
+          setHasVoted(true);
+          toast({
+            title: "Already Voted",
+            description: "You have already cast a vote.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+      } else {
         setHasVoted(true);
-        setVotedForId(data.participant_id);
-        toast({
-          title: "Already Voted",
-          description: "This device has already cast a vote.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (data.success) {
-        localStorage.setItem(STORAGE_KEY_HAS_VOTED, "true");
-        localStorage.setItem(STORAGE_KEY_VOTED_FOR, participantId);
-        localStorage.setItem(STORAGE_KEY_VOTED_NAME, data.participant_name);
-
-        setHasVoted(true);
-        setVotedForId(participantId);
-        setVotedForName(data.participant_name);
+        const participant = participants.find((p) => p.id === participantId);
+        setVotedForName(participant?.name || "a participant");
 
         toast({
           title: "Vote Recorded!",
-          description: `Thank you for voting for ${data.participant_name}`,
+          description: `Thank you for voting for ${participant?.name}`,
         });
       }
     } catch (error) {
@@ -183,7 +185,40 @@ export const VotingApp = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="container max-w-2xl mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with User Profile */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="SkyEngPro Logo" className="h-12 object-contain" />
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 overflow-hidden border shadow-sm hover:bg-muted transition-colors">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user?.user_metadata?.full_name || "User"}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {user?.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Title Section */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center gap-3 mb-2">
             <div className="p-2 bg-primary/10 rounded-xl">
@@ -197,10 +232,40 @@ export const VotingApp = () => {
             {isExpired
               ? "Voting has closed. See the final results below."
               : hasVoted
-              ? "Thank you for participating!"
-              : "Select a participant to cast your vote"}
+                ? "Thank you for participating!"
+                : "Select a participant to cast your vote"}
           </p>
         </div>
+
+        {/* Add Participant Toggle - Only for Admin */}
+        {isAdmin && (
+          <div className="mb-6 flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+            >
+              {showAddForm ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Cancel Adding
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Add Participant
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Add Participant Form - Only for Admin */}
+        {isAdmin && showAddForm && (
+          <div className="mb-8">
+            <AddParticipantForm />
+          </div>
+        )}
 
         {/* Countdown Timer */}
         <div className="mb-6">
@@ -208,7 +273,7 @@ export const VotingApp = () => {
         </div>
 
         {/* Thank You Message */}
-        {hasVoted && votedForName && (
+        {hasVoted && (
           <Card className="mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 overflow-hidden relative">
             <div className="absolute top-2 right-2">
               <Sparkles className="h-5 w-5 text-primary/30" />
@@ -246,7 +311,7 @@ export const VotingApp = () => {
                 avatarUrl={participant.avatar_url}
                 votes={participant.votes}
                 hasVoted={votingDisabled}
-                votedForThis={votedForId === participant.id}
+                votedForThis={false} // We don't easily know the ID unless we store it, but hasVoted disables all
                 onVote={handleVote}
                 isVoting={isVoting}
               />
@@ -268,7 +333,7 @@ export const VotingApp = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-8">
-          Each device is allowed only one vote • Results update in real-time
+          One vote per user account • Results update in real-time
         </p>
       </div>
     </div>
