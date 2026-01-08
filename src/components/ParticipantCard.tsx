@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Vote, Trophy } from "lucide-react";
+import { Vote, Trophy, Trash2 } from "lucide-react";
 
 interface ParticipantCardProps {
   id: string;
@@ -13,6 +13,8 @@ interface ParticipantCardProps {
   votedForThis: boolean;
   onVote: (id: string) => void;
   isVoting: boolean;
+  isAdmin?: boolean;
+  onDelete?: (id: string) => void;
 }
 
 export const ParticipantCard = ({
@@ -24,6 +26,8 @@ export const ParticipantCard = ({
   votedForThis,
   onVote,
   isVoting,
+  isAdmin = false,
+  onDelete,
 }: ParticipantCardProps) => {
   const initials = name
     .split(" ")
@@ -70,6 +74,16 @@ export const ParticipantCard = ({
             <Badge variant="secondary" className="font-mono text-xs">
               {votes} {votes === 1 ? "vote" : "votes"}
             </Badge>
+            {isAdmin && onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                onClick={() => onDelete(id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 

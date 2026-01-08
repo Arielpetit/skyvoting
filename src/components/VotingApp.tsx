@@ -58,7 +58,7 @@ export const VotingApp = () => {
 
       if (data) {
         setHasVoted(true);
-        // @ts-ignore - Supabase types might verify this, but for now assuming join works
+        // @ts-expect-error - Supabase types might verify this, but for now assuming join works
         setVotedForName(data.participants?.name || "a participant");
       }
     };
@@ -124,6 +124,37 @@ export const VotingApp = () => {
       description: "The voting period has ended.",
     });
   }, [toast]);
+
+  const handleDelete = async (participantId: string) => {
+    if (!isAdmin) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this participant and all their votes? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.rpc('delete_participant', { p_id: participantId });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Participant deleted successfully.",
+        variant: "default",
+      });
+
+      // The real-time subscription will handle updating the UI
+    } catch (error) {
+      console.error("Error deleting participant:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete participant. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleVote = async (participantId: string) => {
     if (hasVoted || isVoting || isExpired || !user) return;
@@ -314,6 +345,8 @@ export const VotingApp = () => {
                 votedForThis={false} // We don't easily know the ID unless we store it, but hasVoted disables all
                 onVote={handleVote}
                 isVoting={isVoting}
+                isAdmin={isAdmin}
+                onDelete={handleDelete}
               />
             ))}
 
