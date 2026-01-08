@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddParticipantForm } from "./AddParticipantForm";
 import { Plus, X } from "lucide-react";
+import { AdminVoteDetails } from "./AdminVoteDetails";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -416,9 +417,10 @@ export const VotingApp = () => {
 
         {/* Tabs for Participants and Results */}
         <Tabs defaultValue="vote" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className={`grid w-full mb-4 ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
             <TabsTrigger value="vote">Participants</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
+            {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="vote" className="space-y-3">
@@ -451,6 +453,12 @@ export const VotingApp = () => {
           <TabsContent value="results">
             <ResultsChart participants={participants} />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="admin">
+              <AdminVoteDetails />
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Footer */}
