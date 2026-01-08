@@ -35,6 +35,7 @@ export const VotingApp = () => {
   const [loading, setLoading] = useState(true);
   const [hasVoted, setHasVoted] = useState(false);
   const [votedForName, setVotedForName] = useState<string | null>(null);
+  const [votedForId, setVotedForId] = useState<string | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [deadline, setDeadline] = useState<Date | null>(null);
@@ -58,6 +59,7 @@ export const VotingApp = () => {
 
       if (data) {
         setHasVoted(true);
+        setVotedForId(data.participant_id);
         setVotedForName(data.participants?.name || "a participant");
       }
     };
@@ -234,6 +236,7 @@ export const VotingApp = () => {
       } else {
         setHasVoted(true);
         const participant = participants.find((p) => p.id === participantId);
+        setVotedForId(participantId);
         setVotedForName(participant?.name || "a participant");
 
         toast({
@@ -265,6 +268,9 @@ export const VotingApp = () => {
   }
 
   const votingDisabled = hasVoted || isExpired;
+
+  const maxVotes = Math.max(...participants.map(p => p.votes), 0);
+  const winners = participants.filter(p => p.votes === maxVotes && maxVotes > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -424,7 +430,8 @@ export const VotingApp = () => {
                 avatarUrl={participant.avatar_url}
                 votes={participant.votes}
                 hasVoted={votingDisabled}
-                votedForThis={false} // We don't easily know the ID unless we store it, but hasVoted disables all
+                votedForThis={votedForId === participant.id}
+                isWinner={winners.some(w => w.id === participant.id)}
                 onVote={handleVote}
                 isVoting={isVoting}
                 isAdmin={isAdmin}

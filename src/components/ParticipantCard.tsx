@@ -11,6 +11,7 @@ interface ParticipantCardProps {
   votes: number;
   hasVoted: boolean;
   votedForThis: boolean;
+  isWinner: boolean;
   onVote: (id: string) => void;
   isVoting: boolean;
   isAdmin?: boolean;
@@ -24,6 +25,7 @@ export const ParticipantCard = ({
   votes,
   hasVoted,
   votedForThis,
+  isWinner,
   onVote,
   isVoting,
   isAdmin = false,
@@ -57,7 +59,7 @@ export const ParticipantCard = ({
     >
       <CardContent className="flex items-center gap-4 p-4">
         <Avatar className="h-14 w-14 shrink-0 ring-2 ring-border">
-          {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} /> : null}
+          {avatarUrl ? <AvatarImage src={avatarUrl} alt={name} className="object-cover" /> : null}
           <AvatarFallback className={`${avatarColor} font-semibold text-lg`}>
             {initials}
           </AvatarFallback>
@@ -66,8 +68,8 @@ export const ParticipantCard = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground truncate">{name}</h3>
-            {votedForThis && (
-              <Trophy className="h-4 w-4 text-primary shrink-0" />
+            {isWinner && (
+              <Trophy className="h-4 w-4 text-amber-400 shrink-0" />
             )}
           </div>
           <div className="flex items-center gap-2 mt-1">
@@ -90,7 +92,7 @@ export const ParticipantCard = ({
         <div className="shrink-0">
           {hasVoted ? (
             votedForThis ? (
-              <Badge className="bg-primary text-primary-foreground">
+              <Badge className="bg-foreground text-background">
                 Your vote
               </Badge>
             ) : null
