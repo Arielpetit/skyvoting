@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ParticipantCard } from "./ParticipantCard";
+import { ListCard } from "./ListCard";
 import { ResultsChart } from "./ResultsChart";
 import { CountdownTimer } from "./CountdownTimer";
 import { useToast } from "@/hooks/use-toast";
@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddParticipantForm } from "./AddParticipantForm";
+import { ListDetails } from "./ListDetails";
 import { Plus, X } from "lucide-react";
-import { AdminVoteDetails } from "./AdminVoteDetails";
+import { VoterList } from "./VoterList";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,16 +24,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo.png";
-
-interface Participant {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-  votes: number;
-}
+import { List } from "@/types";
 
 export const VotingApp = () => {
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [lists, setLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasVoted, setHasVoted] = useState(false);
   const [votedForName, setVotedForName] = useState<string | null>(null);
@@ -42,6 +37,8 @@ export const VotingApp = () => {
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [newDeadline, setNewDeadline] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedList, setSelectedList] = useState<List | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
@@ -54,19 +51,27 @@ export const VotingApp = () => {
     const checkVote = async () => {
       const { data, error } = await supabase
         .from("votes")
-        .select("participant_id, participants(name)")
+        .select("list_id, lists(name)")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (data) {
         setHasVoted(true);
-        setVotedForId(data.participant_id);
-        setVotedForName(data.participants?.name || "a participant");
+        setVotedForId(data.list_id);
+        setVotedForName(data.lists?.name || "a team");
       }
     };
 
     checkVote();
   }, [user]);
+
+  // Check LocalStorage for device vote
+  useEffect(() => {
+    const deviceVoted = localStorage.getItem("skyvoting_device_voted");
+    if (deviceVoted === "true") {
+      setHasVoted(true);
+    }
+  }, []);
 
   // Fetch deadline
   useEffect(() => {
@@ -100,32 +105,43 @@ export const VotingApp = () => {
     }
   }, [deadline]);
 
-  // Fetch participants
+  // Fetch lists
   useEffect(() => {
-    const fetchParticipants = async () => {
+    const fetchLists = async () => {
       const { data, error } = await supabase
-        .from("participants")
-        .select("*")
+        .from("lists")
+        .select("*, participants(*), teams(*)")
         .order("votes", { ascending: false });
 
       if (error) {
-        console.error("Error fetching participants:", error);
+        console.error("Error fetching lists:", error);
         toast({
           title: "Error",
-          description: "Failed to load participants",
+          description: "Failed to load lists",
           variant: "destructive",
         });
       } else {
-        setParticipants(data || []);
+        setLists(data || []);
       }
       setLoading(false);
     };
 
-    fetchParticipants();
+    fetchLists();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates for lists, participants, and teams
     const channel = supabase
-      .channel("participants-changes")
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "lists",
+        },
+        () => {
+          fetchLists();
+        }
+      )
       .on(
         "postgres_changes",
         {
@@ -134,7 +150,18 @@ export const VotingApp = () => {
           table: "participants",
         },
         () => {
-          fetchParticipants();
+          fetchLists();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "teams",
+        },
+        () => {
+          fetchLists();
         }
       )
       .subscribe();
@@ -181,27 +208,78 @@ export const VotingApp = () => {
     }
   };
 
-  const handleDelete = async (participantId: string) => {
+  const handleDelete = async (listId: string) => {
     if (!isAdmin) return;
 
     const confirmed = window.confirm(
-      "Are you sure you want to delete this participant and all their votes? This action cannot be undone."
+      "Are you sure you want to delete this team and all their votes? This action cannot be undone."
     );
 
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase.rpc('delete_participant', { p_id: participantId });
+      // Using direct delete since we have cascade set up in migration
+      const { error } = await supabase.from("lists").delete().eq("id", listId);
 
       if (error) throw error;
+
+      // Optimistically update the UI
+      setLists((currentLists) => currentLists.filter((list) => list.id !== listId));
+
+      toast({
+        title: "Success",
+        description: "Team deleted successfully.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete team. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteParticipant = async (participantId: string) => {
+    if (!isAdmin) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this participant? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.from("participants").delete().eq("id", participantId);
+
+      if (error) throw error;
+
+      // Optimistically update the UI
+      setLists((currentLists) =>
+        currentLists.map((list) => ({
+          ...list,
+          participants: list.participants?.filter((p) => p.id !== participantId),
+        }))
+      );
+
+      // Also update selectedList if it's open
+      if (selectedList) {
+        setSelectedList((prev) =>
+          prev
+            ? {
+              ...prev,
+              participants: prev.participants?.filter((p) => p.id !== participantId),
+            }
+            : null
+        );
+      }
 
       toast({
         title: "Success",
         description: "Participant deleted successfully.",
         variant: "default",
       });
-
-      // The real-time subscription will handle updating the UI
     } catch (error) {
       console.error("Error deleting participant:", error);
       toast({
@@ -212,14 +290,25 @@ export const VotingApp = () => {
     }
   };
 
-  const handleVote = async (participantId: string) => {
+  const handleVote = async (listId: string) => {
+    // Double check local storage before allowing vote attempt
+    if (localStorage.getItem("skyvoting_device_voted") === "true") {
+      setHasVoted(true);
+      toast({
+        title: "Already Voted",
+        description: "This device has already been used to vote.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (hasVoted || isVoting || isExpired || !user) return;
 
     setIsVoting(true);
 
     try {
       const { error } = await supabase.from("votes").insert({
-        participant_id: participantId,
+        list_id: listId,
         user_id: user.id,
       });
 
@@ -235,14 +324,17 @@ export const VotingApp = () => {
           throw error;
         }
       } else {
+        // Set LocalStorage flag on success
+        localStorage.setItem("skyvoting_device_voted", "true");
+
         setHasVoted(true);
-        const participant = participants.find((p) => p.id === participantId);
-        setVotedForId(participantId);
-        setVotedForName(participant?.name || "a participant");
+        const list = lists.find((l) => l.id === listId);
+        setVotedForId(listId);
+        setVotedForName(list?.name || "a team");
 
         toast({
           title: "Vote Recorded!",
-          description: `Thank you for voting for ${participant?.name}`,
+          description: `Thank you for voting for ${list?.name}`,
         });
       }
     } catch (error) {
@@ -255,6 +347,11 @@ export const VotingApp = () => {
     } finally {
       setIsVoting(false);
     }
+  };
+
+  const handleViewDetails = (list: List) => {
+    setSelectedList(list);
+    setDetailsOpen(true);
   };
 
   if (loading) {
@@ -270,12 +367,12 @@ export const VotingApp = () => {
 
   const votingDisabled = hasVoted || isExpired;
 
-  const maxVotes = Math.max(...participants.map(p => p.votes), 0);
-  const winners = participants.filter(p => p.votes === maxVotes && maxVotes > 0);
+  const maxVotes = Math.max(...lists.map(l => l.votes), 0);
+  const winners = lists.filter(l => l.votes === maxVotes && maxVotes > 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <div className="container max-w-2xl mx-auto px-4 py-8">
+      <div className="container max-w-4xl mx-auto px-4 py-8">
         {/* Header with User Profile */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
@@ -316,7 +413,7 @@ export const VotingApp = () => {
               <Vote className="h-7 w-7 text-primary" />
             </div>
             <h1 className="text-3xl font-bold text-foreground tracking-tight">
-              Voting System
+              Team Voting
             </h1>
           </div>
           <p className="text-muted-foreground">
@@ -324,7 +421,7 @@ export const VotingApp = () => {
               ? "Voting has closed. See the final results below."
               : hasVoted
                 ? "Thank you for participating!"
-                : "Select a participant to cast your vote"}
+                : "Select a team to cast your vote"}
           </p>
         </div>
 
@@ -354,7 +451,18 @@ export const VotingApp = () => {
         {/* Add Participant Form - Only for Admin */}
         {isAdmin && showAddForm && (
           <div className="mb-8">
-            <AddParticipantForm />
+            <AddParticipantForm onSuccess={() => {
+              setShowAddForm(false);
+              // Manually trigger fetch since realtime might not catch deep relation changes immediately
+              const fetchLists = async () => {
+                const { data } = await supabase
+                  .from("lists")
+                  .select("*, participants(*), teams(*)")
+                  .order("votes", { ascending: false });
+                if (data) setLists(data);
+              };
+              fetchLists();
+            }} />
           </div>
         )}
 
@@ -415,56 +523,63 @@ export const VotingApp = () => {
           </Card>
         )}
 
-        {/* Tabs for Participants and Results */}
+        {/* Tabs for Lists and Results */}
         <Tabs defaultValue="vote" className="w-full">
-          <TabsList className={`grid w-full mb-4 ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
-            <TabsTrigger value="vote">Participants</TabsTrigger>
+          <TabsList className="grid w-full mb-4 grid-cols-3">
+            <TabsTrigger value="vote">Teams</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
-            {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
+            <TabsTrigger value="voters">Voters</TabsTrigger>
           </TabsList>
 
           <TabsContent value="vote" className="space-y-3">
-            {participants.map((participant) => (
-              <ParticipantCard
-                key={participant.id}
-                id={participant.id}
-                name={participant.name}
-                avatarUrl={participant.avatar_url}
-                votes={participant.votes}
-                hasVoted={votingDisabled}
-                votedForThis={votedForId === participant.id}
-                isWinner={winners.some(w => w.id === participant.id)}
-                onVote={handleVote}
-                isVoting={isVoting}
-                isAdmin={isAdmin}
-                onDelete={handleDelete}
-              />
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {lists.map((list) => (
+                <ListCard
+                  key={list.id}
+                  list={list}
+                  hasVoted={votingDisabled}
+                  votedForThis={votedForId === list.id}
+                  isWinner={winners.some(w => w.id === list.id)}
+                  onVote={handleVote}
+                  isVoting={isVoting}
+                  isAdmin={isAdmin}
+                  onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                />
+              ))}
+            </div>
 
-            {participants.length === 0 && (
+            {lists.length === 0 && (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  No participants available yet.
+                  No teams available yet.
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
           <TabsContent value="results">
-            <ResultsChart participants={participants} />
+            <ResultsChart lists={lists} />
           </TabsContent>
 
-          {isAdmin && (
-            <TabsContent value="admin">
-              <AdminVoteDetails />
-            </TabsContent>
-          )}
+          <TabsContent value="voters">
+            <VoterList />
+          </TabsContent>
         </Tabs>
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-8">
           One vote per user account • Results update in real-time
         </p>
+
+        {/* List Details Modal */}
+        <ListDetails
+          list={selectedList}
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          isAdmin={isAdmin}
+          onDeleteParticipant={handleDeleteParticipant}
+        />
       </div>
     </div>
   );

@@ -17,3 +17,10 @@
 - [ ] Verify Duplicate Vote Prevention
 - [ ] UI Polish (User Avatar, Logout)
 - [ ] Final Testing
+
+## Phase 4: List Voting Migration
+- [ ] Create `lists` table migration
+- [ ] Update `participants` and `votes` schema
+- [ ] Implement `ListCard` and `ListDetails` UI
+- [ ] Update Admin "Add" flow for Lists
+- [ ] Verify List Voting flow

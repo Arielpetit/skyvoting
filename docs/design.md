@@ -64,3 +64,22 @@ table votes (
 2.  **Database**: Create/Update `votes` table to link to `auth.users`.
 3.  **Backend Logic**: Update `vote` Edge Function or direct DB logic to use `auth.uid()`.
 4.  **Frontend Logic**: Remove fingerprinting logic (or keep as secondary check), use `user.id` for "has voted" check.
+
+## 7. List Voting System (New Requirement)
+
+### Overview
+Transitioning from individual participant voting to "List" (Team) voting.
+*   **List**: Represents a team (e.g., "Team Alpha").
+*   **Members**: Each list has members with roles (e.g., Delegate, Assistant).
+*   **Voting**: Users vote for a List.
+
+### Data Model Changes
+*   **New Table**: `lists` (id, name, description, votes_count).
+*   **Modified Table**: `participants` adds `list_id` (FK) and `role` (text).
+*   **Modified Table**: `votes` changes `participant_id` to `list_id`.
+
+### UI Changes
+*   **Main View**: Display Cards for Lists (not individuals).
+*   **List Card**: Shows List Name and summary of members.
+*   **List Details**: Clicking a list expands/opens modal to show all members and their roles.
+*   **Admin**: Form to create a List and add members to it simultaneously.

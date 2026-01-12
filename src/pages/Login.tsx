@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,8 +112,10 @@ export const Login = () => {
                                     </div>
                                 </div>
 
+
+
                                 <p className="text-center text-[11px] text-slate-400 leading-relaxed">
-                                    By signing in, you agree to our <span className="text-slate-600 hover:underline cursor-pointer font-medium">Terms of Service</span> and <span className="text-slate-600 hover:underline cursor-pointer font-medium">Privacy Policy</span>.
+                                    By signing in, you agree to our <Link to="/terms" className="text-slate-600 hover:underline cursor-pointer font-medium">Terms of Service</Link> and <Link to="/privacy" className="text-slate-600 hover:underline cursor-pointer font-medium">Privacy Policy</Link>.
                                 </p>
                             </motion.div>
                         </CardContent>
@@ -126,8 +129,8 @@ export const Login = () => {
                     >
                         <div className="flex items-center gap-6">
                             <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">Help</span>
-                            <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">Privacy</span>
-                            <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">Terms</span>
+                            <Link to="/privacy" className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">Privacy</Link>
+                            <Link to="/terms" className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer transition-colors">Terms</Link>
                         </div>
                         <p className="text-xs text-slate-400 font-medium">
                             © 2026 SkyVoting. All rights reserved.
