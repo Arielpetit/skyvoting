@@ -42,7 +42,8 @@ export const VotingApp = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
-  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL && user.email === import.meta.env.VITE_ADMIN_EMAIL;
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAIL || "").split(",").map((e: string) => e.trim());
+  const isAdmin = !!user?.email && adminEmails.includes(user.email);
 
   // Check if user has voted
   useEffect(() => {
