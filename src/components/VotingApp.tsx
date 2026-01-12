@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo.png";
 import { List } from "@/types";
+import { formatUserName } from "@/lib/utils";
 
 export const VotingApp = () => {
   const [lists, setLists] = useState<List[]>([]);
@@ -42,7 +43,8 @@ export const VotingApp = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
-  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL && user.email === import.meta.env.VITE_ADMIN_EMAIL;
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAIL || "").split(",").map((e: string) => e.trim());
+  const isAdmin = !!user?.email && adminEmails.includes(user.email);
 
   // Check if user has voted
   useEffect(() => {
@@ -391,7 +393,7 @@ export const VotingApp = () => {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.user_metadata?.full_name || "User"}</p>
+                  <p className="text-sm font-medium leading-none">{formatUserName(user?.email, user?.user_metadata?.full_name)}</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}
                   </p>

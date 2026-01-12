@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users } from "lucide-react";
+import { formatUserName } from "@/lib/utils";
 
 interface PublicVoter {
     user_email: string;
@@ -95,7 +96,7 @@ export const VoterList = () => {
                             voters.map((voter, index) => (
                                 <TableRow key={index} className="hover:bg-muted/50">
                                     <TableCell className="font-medium">
-                                        {voter.user_full_name || "Anonymous User"}
+                                        {formatUserName(voter.user_email, voter.user_full_name)}
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">
                                         {voter.user_email}

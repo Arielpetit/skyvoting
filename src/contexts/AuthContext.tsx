@@ -13,7 +13,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   loading: true,
-  signOut: async () => {},
+  signOut: async () => { },
 });
 
 export const useAuth = () => {
@@ -26,20 +26,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const handleSession = async (session: Session | null) => {
+      setSession(session);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser && !currentUser.user_metadata?.full_name && currentUser.email) {
+        const prefix = currentUser.email.split('@')[0];
+        const name = prefix
+          .split(/[._-]/)
+          .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+          .join(' ');
+
+        await supabase.auth.updateUser({
+          data: { full_name: name }
+        });
+      }
+
+      setLoading(false);
+    };
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      handleSession(session);
     });
 
     // Listen for changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      handleSession(session);
     });
 
     return () => subscription.unsubscribe();
