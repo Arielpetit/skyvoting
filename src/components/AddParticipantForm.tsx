@@ -8,40 +8,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, UserPlus, Users, Briefcase, Image as ImageIcon } from "lucide-react";
 import { List, Team } from "@/types";
+import { PREDEFINED_LISTS, PREDEFINED_TEAMS, PREDEFINED_ROLES } from "@/lib/constants";
 
 export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) => {
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState("");
-    const [role, setRole] = useState("Delegate");
-    const [selectedListId, setSelectedListId] = useState<string>("");
-    const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+    const [role, setRole] = useState<string>(PREDEFINED_ROLES[0]);
+    const [selectedListName, setSelectedListName] = useState<string>("");
+    const [selectedTeamName, setSelectedTeamName] = useState<string>("");
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-    const [lists, setLists] = useState<List[]>([]);
-    const [teams, setTeams] = useState<Team[]>([]);
-    const [filteredTeams, setFilteredTeams] = useState<Team[]>([]);
-
     const { toast } = useToast();
 
+    // Reset team selection when list changes
     useEffect(() => {
-        const fetchData = async () => {
-            const { data: listsData } = await supabase.from("lists").select("*");
-            const { data: teamsData } = await supabase.from("teams").select("*");
-
-            if (listsData) setLists(listsData);
-            if (teamsData) setTeams(teamsData);
-        };
-        fetchData();
-    }, []);
-
-    useEffect(() => {
-        if (selectedListId) {
-            setFilteredTeams(teams.filter(t => t.list_id === selectedListId));
-        } else {
-            setFilteredTeams([]);
-        }
-    }, [selectedListId, teams]);
+        setSelectedTeamName("");
+    }, [selectedListName]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -52,17 +35,77 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
         }
     };
 
+    const getOrCreateList = async (listName: string): Promise<string | null> => {
+        // 1. Check if list exists
+        const { data: existingList, error: fetchError } = await supabase
+            .from("lists")
+            .select("id")
+            .eq("name", listName)
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (existingList) return existingList.id;
+
+        // 2. Create if not exists
+        const listDef = PREDEFINED_LISTS.find(l => l.name === listName);
+        const { data: newList, error: createError } = await supabase
+            .from("lists")
+            .insert({
+                name: listName,
+                description: listDef?.description || ""
+            })
+            .select("id")
+            .single();
+
+        if (createError) throw createError;
+        return newList.id;
+    };
+
+    const getOrCreateTeam = async (teamName: string, listId: string): Promise<string | null> => {
+        // 1. Check if team exists
+        const { data: existingTeam, error: fetchError } = await supabase
+            .from("teams")
+            .select("id")
+            .eq("name", teamName)
+            .eq("list_id", listId)
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (existingTeam) return existingTeam.id;
+
+        // 2. Create if not exists
+        const { data: newTeam, error: createError } = await supabase
+            .from("teams")
+            .insert({
+                name: teamName,
+                list_id: listId
+            })
+            .select("id")
+            .single();
+
+        if (createError) throw createError;
+        return newTeam.id;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || !selectedListId || !selectedTeamId) {
+        if (!name.trim() || !selectedListName || !selectedTeamName) {
             toast({ title: "Missing Information", description: "Please fill in all required fields.", variant: "destructive" });
             return;
         }
 
         setLoading(true);
         try {
-            let avatarUrl = null;
+            // 1. Ensure List exists
+            const listId = await getOrCreateList(selectedListName);
+            if (!listId) throw new Error("Failed to resolve List ID");
 
+            // 2. Ensure Team exists
+            const teamId = await getOrCreateTeam(selectedTeamName, listId);
+            if (!teamId) throw new Error("Failed to resolve Team ID");
+
+            // 3. Upload Avatar if present
+            let avatarUrl = null;
             if (avatarFile) {
                 const fileExt = avatarFile.name.split(".").pop();
                 const fileName = `${Math.random()}.${fileExt}`;
@@ -81,11 +124,12 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
                 avatarUrl = publicUrl;
             }
 
+            // 4. Create Participant
             const { error } = await supabase.from("participants").insert({
                 name,
                 role,
-                list_id: selectedListId,
-                team_id: selectedTeamId,
+                list_id: listId,
+                team_id: teamId,
                 avatar_url: avatarUrl,
                 votes: 0 // Legacy
             });
@@ -96,7 +140,7 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
             setName("");
             setAvatarFile(null);
             setPreviewUrl(null);
-            // Keep list/team selection for faster entry
+
             if (onSuccess) onSuccess();
         } catch (error: any) {
             console.error("Error adding participant:", error);
@@ -109,6 +153,10 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
             setLoading(false);
         }
     };
+
+    // Helper to get teams for selected list
+    // @ts-ignore - indexing const with string
+    const availableTeams = selectedListName ? (PREDEFINED_TEAMS[selectedListName as keyof typeof PREDEFINED_TEAMS] || []) : [];
 
     return (
         <Card className="border-border/50 shadow-md bg-card/50 backdrop-blur-sm max-w-2xl mx-auto w-full">
@@ -128,13 +176,13 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                         <div className="space-y-2">
                             <Label htmlFor="list" className="text-[10px] sm:text-xs font-medium uppercase text-muted-foreground">List Selection</Label>
-                            <Select value={selectedListId} onValueChange={setSelectedListId}>
+                            <Select value={selectedListName} onValueChange={setSelectedListName}>
                                 <SelectTrigger className="bg-background h-9 sm:h-10 text-sm">
                                     <SelectValue placeholder="Select List" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {lists.map((list) => (
-                                        <SelectItem key={list.id} value={list.id}>{list.name}</SelectItem>
+                                    {PREDEFINED_LISTS.map((list) => (
+                                        <SelectItem key={list.name} value={list.name}>{list.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -142,13 +190,13 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
 
                         <div className="space-y-2">
                             <Label htmlFor="team" className="text-[10px] sm:text-xs font-medium uppercase text-muted-foreground">Team Assignment</Label>
-                            <Select value={selectedTeamId} onValueChange={setSelectedTeamId} disabled={!selectedListId}>
+                            <Select value={selectedTeamName} onValueChange={setSelectedTeamName} disabled={!selectedListName}>
                                 <SelectTrigger className="bg-background h-9 sm:h-10 text-sm">
-                                    <SelectValue placeholder={selectedListId ? "Select Team" : "Choose List First"} />
+                                    <SelectValue placeholder={selectedListName ? "Select Team" : "Choose List First"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {filteredTeams.map((team) => (
-                                        <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                                    {availableTeams.map((teamName: string) => (
+                                        <SelectItem key={teamName} value={teamName}>{teamName}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -179,8 +227,9 @@ export const AddParticipantForm = ({ onSuccess }: { onSuccess?: () => void }) =>
                                     <SelectValue placeholder="Select Role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Delegate">Delegate</SelectItem>
-                                    <SelectItem value="Assistant">Assistant</SelectItem>
+                                    {PREDEFINED_ROLES.map(r => (
+                                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

@@ -160,6 +160,13 @@ export const Login = () => {
                                                 >
                                                     skyengpro.com
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDomain("@plooh.com")}
+                                                    className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 ${domain === "@plooh.com" ? "bg-white text-primary shadow-md shadow-slate-200/50 scale-[1.02]" : "text-slate-400 hover:text-slate-600 hover:bg-white/50"}`}
+                                                >
+                                                    plooh.com
+                                                </button>
                                             </div>
 
                                             <div className="relative group">
@@ -171,7 +178,7 @@ export const Login = () => {
                                                     placeholder="username"
                                                     value={emailPrefix}
                                                     onChange={(e) => setEmailPrefix(e.target.value)}
-                                                    className="w-full h-14 pl-12 pr-32 rounded-2xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition-all text-slate-900 font-medium placeholder:text-slate-300 shadow-sm"
+                                                    className="w-full h-14 pl-12 pr-48 rounded-2xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition-all text-slate-900 font-medium placeholder:text-slate-300 shadow-sm"
                                                     disabled={loading}
                                                 />
                                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200/50">
