@@ -24,3 +24,10 @@
 - [ ] Implement `ListCard` and `ListDetails` UI
 - [ ] Update Admin "Add" flow for Lists
 - [ ] Verify List Voting flow
+
+## Phase 5: Voting Report
+- [ ] Create `useReport` hook for data aggregation
+- [ ] Implement `VotingReport` UI component
+- [ ] Integrate PDF export library
+- [ ] Implement "Export to PDF" functionality
+- [ ] Final verification of report accuracy

@@ -26,6 +26,9 @@ import {
 import logo from "@/assets/logo.png";
 import { List } from "@/types";
 import { formatUserName } from "@/lib/utils";
+import { VotingReport } from "./VotingReport";
+import { EligibleVotersManager } from "./EligibleVotersManager";
+import { FileText, UsersRound } from "lucide-react";
 
 export const VotingApp = () => {
   const [lists, setLists] = useState<List[]>([]);
@@ -632,6 +635,18 @@ export const VotingApp = () => {
             <TabsTrigger value="vote">Teams</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="voters">Voters</TabsTrigger>
+            {isAdmin && (
+              <>
+                <TabsTrigger value="report" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Report
+                </TabsTrigger>
+                <TabsTrigger value="eligible" className="gap-2">
+                  <UsersRound className="h-4 w-4" />
+                  Eligible
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="vote" className="space-y-3">
@@ -668,6 +683,17 @@ export const VotingApp = () => {
           <TabsContent value="voters">
             <VoterList />
           </TabsContent>
+
+          {isAdmin && (
+            <>
+              <TabsContent value="report">
+                <VotingReport />
+              </TabsContent>
+              <TabsContent value="eligible">
+                <EligibleVotersManager />
+              </TabsContent>
+            </>
+          )}
         </Tabs>
 
         {/* Footer */}

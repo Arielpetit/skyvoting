@@ -83,3 +83,23 @@ Transitioning from individual participant voting to "List" (Team) voting.
 *   **List Card**: Shows List Name and summary of members.
 *   **List Details**: Clicking a list expands/opens modal to show all members and their roles.
 *   **Admin**: Form to create a List and add members to it simultaneously.
+
+## 8. Voting Report (New Requirement)
+
+### Overview
+Generate a comprehensive report at the end of the voting process.
+*   **Total Eligible Voters**: Total number of employees/people who should vote.
+*   **Voter List**: List of all eligible voters.
+*   **Actual Voters**: List of people who cast their vote.
+*   **Absences**: List of people who did not vote.
+*   **Total Votes**: Count of all votes cast.
+*   **Votes per List**: Breakdown of votes for each candidate list.
+*   **Winner**: The list with the most votes and its percentage.
+
+### Technical Implementation
+*   **Data Fetching**: A custom hook `useReport` will fetch:
+    *   All participants (to count eligible voters).
+    *   All votes (to count actual voters and breakdown).
+    *   Voter details (to identify who voted and who didn't).
+*   **PDF Generation**: Use `jspdf` and `jspdf-autotable` or `html2canvas` to generate a well-designed PDF.
+*   **UI**: A dedicated "Report" section in the Admin dashboard.
