@@ -40,6 +40,7 @@ export const VotingApp = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedList, setSelectedList] = useState<List | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [votingEnabled, setVotingEnabled] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
@@ -173,6 +174,46 @@ export const VotingApp = () => {
     };
   }, [toast]);
 
+  // Fetch voting status
+  useEffect(() => {
+    const fetchVotingStatus = async () => {
+      const { data } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "voting_enabled")
+        .single();
+
+      if (data) {
+        setVotingEnabled(data.value === "true");
+      }
+    };
+
+    fetchVotingStatus();
+
+    // Subscribe to settings changes
+    const channel = supabase
+      .channel("settings-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "settings",
+          filter: "key=eq.voting_enabled",
+        },
+        (payload) => {
+          if (payload.new && 'value' in payload.new) {
+            setVotingEnabled((payload.new as any).value === "true");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleDeadlineExpired = useCallback(() => {
     setIsExpired(true);
     toast({
@@ -180,6 +221,34 @@ export const VotingApp = () => {
       description: "The voting period has ended.",
     });
   }, [toast]);
+
+  const toggleVoting = async () => {
+    if (!isAdmin) return;
+
+    const newValue = (!votingEnabled).toString();
+    try {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key: "voting_enabled", value: newValue });
+
+      if (error) throw error;
+
+      setVotingEnabled(newValue === "true");
+      toast({
+        title: newValue === "true" ? "Voting Opened" : "Voting Closed",
+        description: newValue === "true" ? "Participants can now vote." : "Voting has been paused.",
+      });
+    } catch (error) {
+      console.error("Error toggling voting:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update voting status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+
 
   const handleSetDeadline = async () => {
     if (!isAdmin || !newDeadline) return;
@@ -367,7 +436,7 @@ export const VotingApp = () => {
     );
   }
 
-  const votingDisabled = hasVoted || isExpired;
+  const votingDisabled = hasVoted || isExpired || !votingEnabled;
 
   const maxVotes = Math.max(...lists.map(l => l.votes), 0);
   const winners = lists.filter(l => l.votes === maxVotes && maxVotes > 0);
@@ -423,30 +492,62 @@ export const VotingApp = () => {
               ? "Voting has closed. See the final results below."
               : hasVoted
                 ? "Thank you for participating!"
-                : "Select a team to cast your vote"}
+                : !votingEnabled
+                  ? "Voting is currently closed. Please wait for the admin to open it."
+                  : "Select a team to cast your vote"}
           </p>
         </div>
 
-        {/* Add Participant Toggle - Only for Admin */}
+        {/* Voting Status Indicator */}
+        {!hasVoted && !isExpired && (
+          <div className="flex justify-center mb-6">
+            <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium border ${votingEnabled ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+              <div className={`w-2 h-2 rounded-full ${votingEnabled ? "bg-green-500 animate-pulse" : "bg-amber-500"}`} />
+              {votingEnabled ? "Voting is Live" : "Voting is Paused"}
+            </div>
+          </div>
+        )}
+
+        {/* Admin Controls */}
         {isAdmin && (
-          <div className="mb-6 flex justify-center">
-            <Button
-              variant="outline"
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
-            >
-              {showAddForm ? (
-                <>
-                  <X className="h-4 w-4" />
-                  Cancel Adding
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  Add Participant
-                </>
-              )}
-            </Button>
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <Button
+                variant={votingEnabled ? "destructive" : "default"}
+                onClick={toggleVoting}
+                className={`gap-2 min-w-[160px] shadow-lg ${votingEnabled ? "" : "bg-green-600 hover:bg-green-700"}`}
+              >
+                {votingEnabled ? (
+                  <>
+                    <LogOut className="h-4 w-4 rotate-180" />
+                    Stop Voting
+                  </>
+                ) : (
+                  <>
+                    <Vote className="h-4 w-4" />
+                    Start Voting
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+              >
+                {showAddForm ? (
+                  <>
+                    <X className="h-4 w-4" />
+                    Cancel Adding
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Add Participant
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         )}
 

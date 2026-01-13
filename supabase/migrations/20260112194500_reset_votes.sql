@@ -11,3 +11,4 @@ TRUNCATE TABLE public.votes CASCADE;
 UPDATE public.lists SET votes = 0;
 
 COMMIT;
+`

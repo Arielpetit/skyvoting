@@ -169,8 +169,8 @@ export const Login = () => {
                                                 </button>
                                             </div>
 
-                                            <div className="relative group">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+                                            <div className="relative group flex items-center w-full h-14 rounded-2xl border border-slate-200 bg-slate-50/50 focus-within:ring-4 focus-within:ring-primary/10 focus-within:border-primary focus-within:bg-white transition-all shadow-sm">
+                                                <div className="pl-4 pr-3 text-slate-400 group-focus-within:text-primary transition-colors shrink-0">
                                                     <Mail className="h-5 w-5" />
                                                 </div>
                                                 <input
@@ -178,12 +178,14 @@ export const Login = () => {
                                                     placeholder="username"
                                                     value={emailPrefix}
                                                     onChange={(e) => setEmailPrefix(e.target.value)}
-                                                    className="w-full h-14 pl-12 pr-48 rounded-2xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition-all text-slate-900 font-medium placeholder:text-slate-300 shadow-sm"
+                                                    className="flex-1 h-full bg-transparent border-none focus:outline-none focus:ring-0 text-slate-900 font-medium placeholder:text-slate-300 min-w-0"
                                                     disabled={loading}
                                                 />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200/50">
-                                                    <AtSign className="h-3.5 w-3.5 text-slate-400" />
-                                                    <span className="text-xs font-bold text-slate-600">{domain.replace("@", "")}</span>
+                                                <div className="pr-4 pl-2 shrink-0">
+                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200/50">
+                                                        <AtSign className="h-3.5 w-3.5 text-slate-400" />
+                                                        <span className="text-xs font-bold text-slate-600 whitespace-nowrap">{domain.replace("@", "")}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
