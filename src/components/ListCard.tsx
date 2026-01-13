@@ -121,7 +121,7 @@ export const ListCard = ({ list, ...props }: ListCardProps) => {
                             </>
                         ) : (
                             <>
-                                <Vote className="h-3 w-3 sm:h-4 sm:w-4" /> Vote Team
+                                <Vote className="h-3 w-3 sm:h-4 sm:w-4" /> Vote
                             </>
                         )}
                     </Button>
